@@ -10,9 +10,23 @@ from googleapiclient import sample_tools
 import googleapiclient
 from prettytable import PrettyTable
 
+# URLs to exclude from API calls
 blacklist = ['/online-threats/', '/security_response/', '/support/']
 
+# Table headers
 t = PrettyTable(['Metric', 'Above/Below StDev', 'URL', 'Mean', 'StDev', '# of StDevs', 'Actual'])
+
+# Sets how many days to look back from current date. Used in timedelta() methods.
+# This should help grab the latest date that has available data in GSC API.
+recent_date_delta = 2
+
+# Sets one extra day behind from variable recent_date_delta
+# This ensures data series is queried excluding most recent day of data
+recent_date_delta_add_one = recent_date_delta + 1
+
+# Sets the full date range for GSC API to be queried
+# Essentially determines the start date
+full_time_series = 60
 
 # Declare command-line flags.
 argparser = argparse.ArgumentParser(add_help=False)
@@ -73,9 +87,9 @@ def standard_dev_calculation(data_list, lp_url, field_text, single_day):
 
 def second_request(lp_rows, service, flags):
   today_date = date.today()
-  latest_date = today_date - timedelta(days=2)
-  latest_date_comp = today_date - timedelta(days=3)
-  start_date = today_date - timedelta(days=60)
+  latest_date = today_date - timedelta(days=recent_date_delta)
+  latest_date_comp = today_date - timedelta(days=recent_date_delta_add_one)
+  start_date = today_date - timedelta(days=full_time_series)
 
 
   latest_date = latest_date.strftime('%Y-%m-%d')
@@ -126,7 +140,7 @@ def second_request(lp_rows, service, flags):
 
 
 def initial_request(service, flags):
-  latest_date = date.today() - timedelta(days=2)
+  latest_date = date.today() - timedelta(days=recent_date_delta)
 
   latest_date = latest_date.strftime('%Y-%m-%d')
 
