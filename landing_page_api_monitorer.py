@@ -140,29 +140,16 @@ def initial_request(service, flags):
 
 
 def gsc_request(start_date, end_date, service, flags, lp_url=None):
+
   if lp_url == None:
-    try:
-      request = {
+    request = {
         'startDate': start_date,
         'endDate': end_date,
         'dimensions': ['date', 'page'],
         'rowLimit': 5000
       }
-      response = execute_request(service, flags.property_uri, request)
-    except googleapiclient.errors.HttpError as e:
-      print e
-      time.sleep(60)
-      request = {
-        'startDate': start_date,
-        'endDate': end_date,
-        'dimensions': ['date', 'page'],
-        'rowLimit': 5000
-      }
-      response = execute_request(service, flags.property_uri, request)
-    return response
   else:
-    try:
-      request = {
+    request = {
         'startDate': start_date,
         'endDate': end_date,
         'dimensions': ['date', 'page'],
@@ -179,29 +166,14 @@ def gsc_request(start_date, end_date, service, flags, lp_url=None):
         ],
         'rowLimit': 5000
       }
-      response = execute_request(service, flags.property_uri, request)
-    except googleapiclient.errors.HttpError as e:
-      print e
-      time.sleep(60)
-      request = {
-        'startDate': start_date,
-        'endDate': end_date,
-        'dimensions': ['date', 'page'],
-        'dimensionFilterGroups': [
-          {
-            'filters': [
-              {
-                'dimension': 'page',
-                'operator': 'equals',
-                'expression': lp_url
-              }
-            ]
-          }
-        ],
-        'rowLimit': 5000
-      }
-      response = execute_request(service, flags.property_uri, request)
-    return response
+
+  try:
+    response = execute_request(service, flags.property_uri, request)
+  except googleapiclient.errors.HttpError as e:
+    print e
+    time.sleep(60)
+    response = execute_request(service, flags.property_uri, request)
+  return response
 
 
 
