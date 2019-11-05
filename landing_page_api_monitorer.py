@@ -85,53 +85,14 @@ def second_request(lp_rows, service, flags):
 
   for lp_row in lp_rows:
     lp_url = lp_row['keys'][1]
-    # Build if/else logic that checks if url contains 'online-threats', 'support', etc. Essentially we're checking for non-important pages and passing on them.
 
+    # Checks if url contains 'online-threats', 'support', etc. Essentially we're checking for non-important pages and passing on them.
     exist_in_list = [list_exist for list_exist in blacklist if(list_exist in lp_url)]
     exist_in_list = bool(exist_in_list)
 
     if exist_in_list == False:
 
-      try:
-        single_request = {
-          'startDate': latest_date,
-          'endDate': latest_date,
-          'dimensions': ['date', 'page'],
-          'dimensionFilterGroups': [
-            {
-              'filters': [
-                {
-                  'dimension': 'page',
-                  'operator': 'equals',
-                  'expression': lp_url
-                }
-              ]
-            }
-          ],
-          'rowLimit': 5000
-        }
-        single_response = execute_request(service, flags.property_uri, single_request)
-      except googleapiclient.errors.HttpError as e:
-        print e
-        time.sleep(60)
-        single_request = {
-          'startDate': latest_date,
-          'endDate': latest_date,
-          'dimensions': ['date', 'page'],
-          'dimensionFilterGroups': [
-            {
-              'filters': [
-                {
-                  'dimension': 'page',
-                  'operator': 'equals',
-                  'expression': lp_url
-                }
-              ]
-            }
-          ],
-          'rowLimit': 5000
-        }
-        single_response = execute_request(service, flags.property_uri, single_request)
+      single_response = gsc_request(latest_date, latest_date, service, flags, lp_url)
 
       if 'rows' not in single_response:
         print 'Empty response'
@@ -141,49 +102,7 @@ def second_request(lp_rows, service, flags):
       single_day_clicks = single_row['clicks']
       single_day_impressions = single_row['impressions']
 
-
-
-
-      try:
-        request = {
-          'startDate': start_date,
-          'endDate': latest_date_comp,
-          'dimensions': ['date', 'page'],
-          'dimensionFilterGroups': [
-            {
-              'filters': [
-                {
-                  'dimension': 'page',
-                  'operator': 'equals',
-                  'expression': lp_url
-                }
-              ]
-            }
-          ],
-          'rowLimit': 5000
-        }
-        response = execute_request(service, flags.property_uri, request)
-      except googleapiclient.errors.HttpError as e:
-        print e
-        time.sleep(60)
-        request = {
-          'startDate': start_date,
-          'endDate': latest_date_comp,
-          'dimensions': ['date', 'page'],
-          'dimensionFilterGroups': [
-            {
-              'filters': [
-                {
-                  'dimension': 'page',
-                  'operator': 'equals',
-                  'expression': lp_url
-                }
-              ]
-            }
-          ],
-          'rowLimit': 5000
-        }
-        response = execute_request(service, flags.property_uri, request)
+      response = gsc_request(start_date, latest_date_comp, service, flags, lp_url)
 
       if 'rows' not in response:
         print 'Empty response'
@@ -207,31 +126,12 @@ def second_request(lp_rows, service, flags):
 
 
 def initial_request(service, flags):
-  stop_date = date.today()
-  start_date = stop_date - timedelta(days=2)
+  latest_date = date.today() - timedelta(days=2)
 
-  stop_date = stop_date.strftime('%Y-%m-%d')
-  start_date = start_date.strftime('%Y-%m-%d')
+  latest_date = latest_date.strftime('%Y-%m-%d')
 
-  try:
-    request = {
-      'startDate': start_date,
-      'endDate': start_date,
-      'dimensions': ['date', 'page'],
-      "aggregationType": "byPage",
-      'rowLimit': 5000
-    }
-    response = execute_request(service, flags.property_uri, request)
-  except googleapiclient.errors.HttpError as e:
-    print e
-    time.sleep(60)
-    request = {
-      'startDate': start_date,
-      'endDate': start_date,
-      'dimensions': ['date', 'page'],
-      'rowLimit': 5000
-    }
-    response = execute_request(service, flags.property_uri, request)
+  response = gsc_request(latest_date, latest_date, service, flags)
+
   if 'rows' not in response:
     print 'Empty response'
     return 
@@ -239,12 +139,75 @@ def initial_request(service, flags):
   second_request(rows, service, flags)
 
 
+def gsc_request(start_date, end_date, service, flags, lp_url=None):
+  if lp_url == None:
+    try:
+      request = {
+        'startDate': start_date,
+        'endDate': end_date,
+        'dimensions': ['date', 'page'],
+        'rowLimit': 5000
+      }
+      response = execute_request(service, flags.property_uri, request)
+    except googleapiclient.errors.HttpError as e:
+      print e
+      time.sleep(60)
+      request = {
+        'startDate': start_date,
+        'endDate': end_date,
+        'dimensions': ['date', 'page'],
+        'rowLimit': 5000
+      }
+      response = execute_request(service, flags.property_uri, request)
+    return response
+  else:
+    try:
+      request = {
+        'startDate': start_date,
+        'endDate': end_date,
+        'dimensions': ['date', 'page'],
+        'dimensionFilterGroups': [
+          {
+            'filters': [
+              {
+                'dimension': 'page',
+                'operator': 'equals',
+                'expression': lp_url
+              }
+            ]
+          }
+        ],
+        'rowLimit': 5000
+      }
+      response = execute_request(service, flags.property_uri, request)
+    except googleapiclient.errors.HttpError as e:
+      print e
+      time.sleep(60)
+      request = {
+        'startDate': start_date,
+        'endDate': end_date,
+        'dimensions': ['date', 'page'],
+        'dimensionFilterGroups': [
+          {
+            'filters': [
+              {
+                'dimension': 'page',
+                'operator': 'equals',
+                'expression': lp_url
+              }
+            ]
+          }
+        ],
+        'rowLimit': 5000
+      }
+      response = execute_request(service, flags.property_uri, request)
+    return response
+
+
 
 def execute_request(service, property_uri, request):
   return service.searchanalytics().query(
       siteUrl=property_uri, body=request).execute()
-
-
 
 
 if __name__ == '__main__':
