@@ -14,7 +14,8 @@ from prettytable import PrettyTable
 blacklist = ['/online-threats/', '/security_response/', '/support/']
 
 # Table headers
-t = PrettyTable(['Metric', 'Above/Below StDev', 'URL', 'Mean', 'StDev', '# of StDevs', 'Actual'])
+standard_table = PrettyTable(['Metric', 'Above/Below StDev', 'URL', 'Mean', 'StDev', '# of StDevs', 'Actual'])
+flag_table = PrettyTable(['Metric', 'Above/Below StDev', 'URL', 'Mean', 'StDev', '# of StDevs', 'Actual'])
 
 # Sets how many days to look back from current date. Used in timedelta() methods.
 # This should help grab the latest date that has available data in GSC API.
@@ -47,39 +48,35 @@ def standard_dev_calculation(data_list, lp_url, field_text, single_day):
 
   mean_calc = np.mean(data_list)
 
-  one_stdev = np.std(data_list)
-  above_one_stand_dev = mean_calc + one_stdev
-  below_one_stand_dev = mean_calc - one_stdev
-
-  two_stdev = np.std(data_list) * 2
-  above_two_stand_dev = mean_calc + two_stdev
-  below_two_stand_dev = mean_calc - two_stdev
-
-  three_stdev = np.std(data_list) * 3
-  above_three_stand_dev = mean_calc + three_stdev
-  below_three_stand_dev = mean_calc - three_stdev
+  i = 3
 
   if mean_calc >= 100 or single_day >= 100:
-    if single_day > above_three_stand_dev:
-      t.add_row([field_text, 'Above', lp_url, mean_calc, one_stdev, '>+3', single_day])
-      print t
-    elif single_day > above_two_stand_dev and single_day <= above_three_stand_dev:
-      t.add_row([field_text, 'Above', lp_url, mean_calc, one_stdev, '+3', single_day])
-      print t
-    elif single_day > above_one_stand_dev and single_day <= above_two_stand_dev:
-      t.add_row([field_text, 'Above', lp_url, mean_calc, one_stdev, '+2', single_day])
-      print t
+    print 'test'
+    while i > 0:
+      stdev = np.std(data_list)
+      stdev_multiplier = stdev * i
+      above_mean = mean_calc + stdev_multiplier
+      below_mean = mean_calc - stdev_multiplier
 
+      if single_day >= above_mean:
+        if i == 3:
+          flag_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev_multiplier, '+' + str(i), single_day])
+          print flag_table
+        else:
+          standard_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev_multiplier, '+' + str(i), single_day])
+          print standard_table
+        return
 
-    if single_day < below_three_stand_dev:
-      t.add_row([field_text, 'Below', lp_url, mean_calc, one_stdev, '<-3', single_day])
-      print t
-    elif single_day >= below_three_stand_dev and single_day < below_two_stand_dev:
-      t.add_row([field_text, 'Below', lp_url, mean_calc, one_stdev, '-3', single_day])
-      print t
-    elif single_day >= below_two_stand_dev and single_day < below_one_stand_dev:
-      t.add_row([field_text, 'Below', lp_url, mean_calc, one_stdev, '-2', single_day])
-      print t
+      if single_day <= below_mean:
+        if i ==3:
+          flag_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev_multiplier, '-' + str(i), single_day])
+          print flag_table
+        else:
+          standard_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev_multiplier, '-' + str(i), single_day])
+          print standard_table
+        return
+
+      i = i - 1
   else:
     print 'Data set too small ' + lp_url + ' ' + str(single_day)
 
@@ -98,10 +95,12 @@ def second_request(lp_rows, service, flags):
 
 
   for lp_row in lp_rows:
+    # Grabs URL from response
     lp_url = lp_row['keys'][1]
 
     # Checks if url contains 'online-threats', 'support', etc. Essentially we're checking for non-important pages and passing on them.
     exist_in_list = [list_exist for list_exist in blacklist if(list_exist in lp_url)]
+    # Converts to boolean
     exist_in_list = bool(exist_in_list)
 
     if exist_in_list == False:
