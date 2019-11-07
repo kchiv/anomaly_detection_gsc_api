@@ -1,4 +1,3 @@
-
 import argparse
 import sys
 from datetime import datetime
@@ -6,9 +5,13 @@ from datetime import date
 from datetime import timedelta
 import time
 import numpy as np
+import pandas as pd
 from googleapiclient import sample_tools
 import googleapiclient
 from prettytable import PrettyTable
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 
 # URLs to exclude from API calls
 blacklist = ['/online-threats/', '/security_response/', '/support/']
@@ -43,36 +46,43 @@ def main(argv):
   initial_request(service, flags)
 
 
+def plot_chart(lp_url, full_data_frame, field_text):
+  full_data_frame.plot(kind='line', y=field_text, x='Dates', title=lp_url)
+  plt.show()
 
-def standard_dev_calculation(data_list, lp_url, field_text, single_day):
+
+
+def standard_dev_calculation(data_list, lp_url, field_text, single_day, full_data_frame):
 
   mean_calc = np.mean(data_list)
+  stdev = np.std(data_list)
 
   i = 3
 
   if mean_calc >= 100 or single_day >= 100:
     print 'test'
     while i > 0:
-      stdev = np.std(data_list)
       stdev_multiplier = stdev * i
       above_mean = mean_calc + stdev_multiplier
       below_mean = mean_calc - stdev_multiplier
 
       if single_day >= above_mean:
         if i == 3:
-          flag_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev_multiplier, '+' + str(i), single_day])
+          flag_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev, '+' + str(i), single_day])
+          plot_chart(lp_url, full_data_frame, field_text)
           print flag_table
         else:
-          standard_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev_multiplier, '+' + str(i), single_day])
+          standard_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev, '+' + str(i), single_day])
           print standard_table
         return
 
       if single_day <= below_mean:
         if i ==3:
-          flag_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev_multiplier, '-' + str(i), single_day])
+          flag_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev, '-' + str(i), single_day])
+          plot_chart(lp_url, full_data_frame, field_text)
           print flag_table
         else:
-          standard_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev_multiplier, '-' + str(i), single_day])
+          standard_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev, '-' + str(i), single_day])
           print standard_table
         return
 
@@ -125,13 +135,29 @@ def second_request(lp_rows, service, flags):
 
       clicks_list = []
       impressions_list = []
+      date_list = []
 
       for row in rows:
         clicks_list.append(row['clicks'])
         impressions_list.append(row['impressions'])
+        date_list.append(row['keys'][0])
 
-      standard_dev_calculation(clicks_list, lp_url, 'Clicks', single_day_clicks)
-      standard_dev_calculation(impressions_list, lp_url, 'Impressions', single_day_impressions)
+      # Creates dictionary for usage in dataframe
+      full_data_dict = {
+        'Dates': date_list,
+        'Clicks': clicks_list,
+        'Impressions': impressions_list
+      }
+
+      # Builds dataframe. Dataframe needed for charts.
+      full_data_frame = pd.DataFrame(full_data_dict)
+      # Appends latest day of data to dataframe
+      full_data_frame.loc[full_data_frame.index.max()+1] = [single_day_clicks, latest_date, single_day_impressions]
+      # Sorts dataframe
+      full_data_frame.sort_values(['Dates'], inplace=True)
+
+      standard_dev_calculation(clicks_list, lp_url, 'Clicks', single_day_clicks, full_data_frame)
+      standard_dev_calculation(impressions_list, lp_url, 'Impressions', single_day_impressions, full_data_frame)
 
     else:
       print 'Not Important Page ' + lp_url
