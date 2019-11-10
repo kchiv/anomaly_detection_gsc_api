@@ -9,12 +9,20 @@ import pandas as pd
 from googleapiclient import sample_tools
 import googleapiclient
 from prettytable import PrettyTable
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+import chart_studio
+import chart_studio.plotly as py
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import smtplib
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEText import MIMEText
+from email.MIMEImage import MIMEImage
+import config
+
+chart_studio.tools.set_credentials_file(username=config.plotly_username, api_key=config.plotly_api_key)
 
 # URLs to exclude from API calls
-blacklist = ['/online-threats/', '/security_response/', '/support/']
+blacklist = ['/online-threats/', '/security_response/', '/support/', '/education/']
 
 # Table headers
 standard_table = PrettyTable(['Metric', 'Above/Below StDev', 'URL', 'Mean', 'StDev', '# of StDevs', 'Actual'])
@@ -32,6 +40,8 @@ recent_date_delta_add_one = recent_date_delta + 1
 # Essentially determines the start date
 full_time_series = 60
 
+plotly_list = ''
+
 # Declare command-line flags.
 argparser = argparse.ArgumentParser(add_help=False)
 argparser.add_argument('property_uri', type=str,
@@ -44,23 +54,48 @@ def main(argv):
       argv, 'webmasters', 'v3', __doc__, __file__, parents=[argparser],
       scope='https://www.googleapis.com/auth/webmasters.readonly')
   initial_request(service, flags)
+  send_email(flags)
 
 
 def plot_chart(lp_url, full_data_frame, field_text):
-  full_data_frame.plot(kind='line', y=field_text, x='Dates', title=lp_url)
-  plt.show()
+  # fig = go.Figure()
+  fig = make_subplots(specs=[[{"secondary_y": True}]])
 
+  fig.add_trace(go.Scatter(
+    x=full_data_frame['Dates'].tolist(),
+    y=full_data_frame['Impressions'].tolist(),
+    name='Impressions'
+    ),
+    secondary_y=False,
+  )
+
+  fig.add_trace(go.Scatter(
+    x=full_data_frame['Dates'].tolist(),
+    y=full_data_frame['Clicks'].tolist(),
+    name='Clicks'
+    ),
+    secondary_y=True,
+  )
+
+  fig.update_layout(
+    xaxis_title = 'Dates'
+  )
+
+  fig.update_yaxes(title_text='Impressions', secondary_y=False)
+  fig.update_yaxes(title_text='Clicks', secondary_y=True)
+
+  return lp_url, py.plot(fig, auto_open=False)
 
 
 def standard_dev_calculation(data_list, lp_url, field_text, single_day, full_data_frame):
 
+  global plotly_list
   mean_calc = np.mean(data_list)
   stdev = np.std(data_list)
 
   i = 3
 
   if mean_calc >= 100 or single_day >= 100:
-    print 'test'
     while i > 0:
       stdev_multiplier = stdev * i
       above_mean = mean_calc + stdev_multiplier
@@ -69,21 +104,19 @@ def standard_dev_calculation(data_list, lp_url, field_text, single_day, full_dat
       if single_day >= above_mean:
         if i == 3:
           flag_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev, '+' + str(i), single_day])
-          plot_chart(lp_url, full_data_frame, field_text)
-          print flag_table
+          lp_url_str, plotly_url_str = plot_chart(lp_url, full_data_frame, field_text)
+          plotly_list += field_text + '\n' + lp_url_str + '\n' + plotly_url_str + '\n\n'
         else:
           standard_table.add_row([field_text, 'Above', lp_url, mean_calc, stdev, '+' + str(i), single_day])
-          print standard_table
         return
 
       if single_day <= below_mean:
         if i ==3:
           flag_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev, '-' + str(i), single_day])
-          plot_chart(lp_url, full_data_frame, field_text)
-          print flag_table
+          lp_url_str, plotly_url_str = plot_chart(lp_url, full_data_frame, field_text)
+          plotly_list += field_text + '\n' + lp_url_str + '\n' + plotly_url_str + '\n\n'
         else:
           standard_table.add_row([field_text, 'Below', lp_url, mean_calc, stdev, '-' + str(i), single_day])
-          print standard_table
         return
 
       i = i - 1
@@ -213,6 +246,30 @@ def gsc_request(start_date, end_date, service, flags, lp_url=None):
     time.sleep(60)
     response = execute_request(service, flags.property_uri, request)
   return response
+
+def send_email(flags):
+  # email data
+  fromaddr = config.from_email
+  toaddr = config.to_email
+  msg = MIMEMultipart()
+  msg['From'] = fromaddr
+  msg['To'] = toaddr
+  server = smtplib.SMTP('smtp.gmail.com', 587)
+  server.starttls()
+  server.login(fromaddr, config.email_password)
+
+  msg['Subject'] = flags.property_uri + " Daily Anomaly Detection"
+  body = 'The following pages featured substantial changes in performance:\n' 
+  body += standard_table.get_string(title='Less Than 3 Standard Deviations') 
+  body += '\n\n' + flag_table.get_string(title='More Than 3 Standard Deviations')
+  body += '\n\n' + plotly_list
+
+
+  # send email
+  msg.attach(MIMEText(body.encode('utf-8'), 'plain', 'utf-8'))
+  text = msg.as_string()
+  server.sendmail(fromaddr, toaddr, text)
+  server.quit()
 
 
 
