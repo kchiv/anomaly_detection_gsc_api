@@ -261,7 +261,10 @@ def send_email(flags):
   server.login(fromaddr, config.email_password)
 
   msg['Subject'] = flags.property_uri + " Daily Anomaly Detection"
-  body = 'The following pages featured substantial changes in performance:\n' 
+  today_date = date.today()
+  date_queried = today_date - timedelta(days=recent_date_delta)
+  body = 'Date Queried: ' + date_queried.strftime('%Y-%m-%d') + '\n\n'
+  body += 'The following pages featured substantial changes in performance:\n' 
   body += standard_table.get_string(title='Less Than 3 Standard Deviations') 
   body += '\n\n' + flag_table.get_string(title='More Than 3 Standard Deviations')
   body += '\n\n' + plotly_list
