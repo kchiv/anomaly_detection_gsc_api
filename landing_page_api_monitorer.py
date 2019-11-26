@@ -58,33 +58,35 @@ def main(argv):
 
 
 def plot_chart(lp_url, full_data_frame, field_text):
-  # fig = go.Figure()
-  fig = make_subplots(specs=[[{"secondary_y": True}]])
+  try:
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-  fig.add_trace(go.Scatter(
-    x=full_data_frame['Dates'].tolist(),
-    y=full_data_frame['Impressions'].tolist(),
-    name='Impressions'
-    ),
-    secondary_y=False,
-  )
+    fig.add_trace(go.Scatter(
+      x=full_data_frame['Dates'].tolist(),
+      y=full_data_frame['Impressions'].tolist(),
+      name='Impressions'
+      ),
+      secondary_y=False,
+    )
 
-  fig.add_trace(go.Scatter(
-    x=full_data_frame['Dates'].tolist(),
-    y=full_data_frame['Clicks'].tolist(),
-    name='Clicks'
-    ),
-    secondary_y=True,
-  )
+    fig.add_trace(go.Scatter(
+      x=full_data_frame['Dates'].tolist(),
+      y=full_data_frame['Clicks'].tolist(),
+      name='Clicks'
+      ),
+      secondary_y=True,
+    )
 
-  fig.update_layout(
-    xaxis_title = 'Dates'
-  )
+    fig.update_layout(
+      xaxis_title = 'Dates'
+    )
 
-  fig.update_yaxes(title_text='Impressions', secondary_y=False)
-  fig.update_yaxes(title_text='Clicks', secondary_y=True)
+    fig.update_yaxes(title_text='Impressions', secondary_y=False)
+    fig.update_yaxes(title_text='Clicks', secondary_y=True)
 
-  return lp_url, py.plot(fig, auto_open=False)
+    return lp_url, py.plot(fig, auto_open=False)
+  except chart_studio.exceptions.PlotlyRequestError:
+    return lp_url, 'Account limit reached. Delete charts in Plotly account.'
 
 
 def standard_dev_calculation(data_list, lp_url, field_text, single_day, full_data_frame):
